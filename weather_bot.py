@@ -130,7 +130,16 @@ def build_html(default_query: str) -> str:
     .chartMeta{{margin-top:6px;display:flex;gap:6px;overflow-x:auto;padding-bottom:2px}}
     .metaChip{{flex:0 0 auto;border:1px solid rgba(255,255,255,.18);background:rgba(15,23,42,.35);border-radius:999px;padding:4px 8px;font-size:12px;font-weight:800;color:#dbeafe;white-space:nowrap}}
     .metaChip b{{color:#fde68a}}
-    .hrow{{display:grid;grid-template-columns:64px 56px 1fr 60px 66px 70px 72px;gap:6px;align-items:center;padding:7px 6px;border-top:1px dashed rgba(255,255,255,.08);font-size:13px}} .hrow:first-child{{border-top:none}}
+    .hourStrip{{display:flex;gap:8px;overflow-x:auto;padding:4px 2px 2px}}
+    .hourCard{{min-width:126px;padding:10px 10px 11px;border-radius:12px;border:1px solid rgba(255,255,255,.12);background:rgba(15,23,42,.34)}}
+    .hourTop{{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}}
+    .hourTime{{font-size:15px;font-weight:900;color:#dbeafe}}
+    .hourBadge{{padding:3px 8px;border-radius:999px;background:rgba(255,255,255,.08);font-size:11px;font-weight:900;color:#e2e8f0}}
+    .hourTemp{{font-size:28px;font-weight:900;line-height:1;color:#f8fbff}}
+    .hourType{{margin-top:4px;font-size:13px;font-weight:800;color:#dbe7f7}}
+    .hourMetaRow{{display:flex;justify-content:space-between;gap:8px;margin-top:7px;font-size:12px;font-weight:800;color:#bfd2ea}}
+    .hourWarn{{border-color:rgba(248,113,113,.45);background:rgba(127,29,29,.22)}}
+    .hourPeak{{box-shadow:inset 0 0 0 1px rgba(251,191,36,.4)}}
     .wrow{{display:grid;grid-template-columns:72px 46px 74px 90px 74px 1fr 184px;gap:6px;align-items:center;padding:7px 6px;border-top:1px dashed rgba(255,255,255,.08);font-size:13px}} .wrow:first-child{{border-top:none}}
     .activityWrap{{display:flex;gap:6px;justify-content:flex-end;flex-wrap:wrap}}
     .activityBadge{{display:inline-flex;align-items:center;gap:5px;padding:6px 10px;border-radius:999px;font-size:14px;font-weight:900;line-height:1;border:1px solid rgba(255,255,255,.18);text-shadow:0 1px 1px rgba(0,0,0,.35)}}
@@ -190,10 +199,11 @@ def build_html(default_query: str) -> str:
       .brandTag{{position:static;display:inline-block;margin-top:6px}}
       .bgFun,.sparkle{{display:none}}
       .skyBuddy{{position:static;display:block;margin:0 auto 4px;animation:none}}
-      .hrow,.wrow{{display:flex;flex-wrap:wrap;gap:5px;font-size:12px;padding:8px 0}}
-      .hrow>div,.wrow>div{{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.10);border-radius:8px;padding:4px 6px}}
-      .hrow>div:nth-child(1),.wrow>div:nth-child(1){{font-weight:900}}
-      .hrow>div:nth-child(3),.wrow>div:nth-child(6){{flex:1 1 100%}}
+      .wrow{{display:flex;flex-wrap:wrap;gap:5px;font-size:12px;padding:8px 0}}
+      .wrow>div{{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.10);border-radius:8px;padding:4px 6px}}
+      .wrow>div:nth-child(1){{font-weight:900}}
+      .wrow>div:nth-child(6){{flex:1 1 100%}}
+      .hourCard{{min-width:116px}}
       .summary{{font-size:15px;line-height:1.5}}
       .summaryTrek{{font-size:18px;line-height:1.4}}
       .fun{{font-size:17px;line-height:1.65;padding:13px 14px}}
@@ -225,6 +235,19 @@ def build_html(default_query: str) -> str:
     const FAVORITE_KEY = 'weather_dash_favs_v1';
     let FAVORITES = [];
     const NEARBY_SPOTS = ['정선군','영월군','제천시','원주시','삼척시','동해시','강릉시','울진군','양양군','속초시'];
+    const OFFICIAL_NAME_OVERRIDES = {{
+      '울진': '울진군',
+      '영월': '영월군',
+      '양양': '양양군',
+      '정선': '정선군',
+      '태백': '태백시',
+      '강릉': '강릉시',
+      '삼척': '삼척시',
+      '동해': '동해시',
+      '속초': '속초시',
+      '원주': '원주시',
+      '제천': '제천시',
+    }};
     const showFatal = (title, detail='') => {{
       const safe = String(detail || '').replace(/[<>&]/g, s => ({{'<':'&lt;','>':'&gt;','&':'&amp;'}}[s]));
       app.innerHTML = `<div class='card' style='background:rgba(239,68,68,.14);border-color:rgba(248,113,113,.55);color:#fee2e2'>
@@ -246,7 +269,9 @@ def build_html(default_query: str) -> str:
     const normalizeDisplayName = (raw, query, result=null) => {{
       const r = (raw || '').trim();
       const q = (query || '').trim();
+      const compactQ = q.replace(/\\s+/g,'');
       const hasAdminSuffix = /(특별시|광역시|특별자치시|특별자치도|시|군|구|읍|면|동|리|도)$/.test(q);
+      if (OFFICIAL_NAME_OVERRIDES[compactQ]) return OFFICIAL_NAME_OVERRIDES[compactQ];
       if (q.includes('태백') || r === '태백' || r.includes('태백')) return '태백시';
       if (q.includes('정선')) return '정선군';
       if (q.includes('제주도') || q.includes('제주특별자치도')) return '제주특별자치도';
@@ -255,7 +280,9 @@ def build_html(default_query: str) -> str:
       const adminCandidates = [result?.admin3, result?.admin2, result?.admin1]
         .map(x => String(x || '').trim())
         .filter(Boolean);
-      const pickedAdmin = adminCandidates.find(x => /(특별시|광역시|특별자치시|특별자치도|시|군|구|읍|면|동|리|도)$/.test(x));
+      const pickedAdmin =
+        adminCandidates.find(x => /(특별시|광역시|특별자치시|특별자치도|시|군|구)$/.test(x)) ||
+        adminCandidates.find(x => /(읍|면|동|리)$/.test(x));
       if (pickedAdmin) return pickedAdmin;
 
       // 시청/군청/구청 등 기관명으로 잡히면 행정단위명으로 보정
@@ -317,13 +344,17 @@ def build_html(default_query: str) -> str:
         const a1 = String(r.admin1||'').replace(/\\s+/g,'').toLowerCase();
         const a2 = String(r.admin2||'').replace(/\\s+/g,'').toLowerCase();
         const a3 = String(r.admin3||'').replace(/\\s+/g,'').toLowerCase();
+        const fc = String(r.feature_code || '');
         let score = 0;
         if(name === q) score += 120;
         if(name.startsWith(q) || q.startsWith(name)) score += 80;
         if(a3.includes(q)) score += 60;
         if(a2.includes(q)) score += 45;
         if(a1.includes(q)) score += 30;
-        if((r.feature_code || '').startsWith('ADM')) score += 15; // 행정단위 우선
+        if(fc === 'ADM2') score += 35;
+        else if(fc === 'ADM1') score += 25;
+        else if(fc === 'ADM3') score += 15;
+        else if(fc.startsWith('ADM')) score += 10;
         if((r.country_code || '').toUpperCase() === 'KR') score += 10;
         return {{r, score}};
       }}).sort((x,y)=>y.score-x.score);
@@ -606,7 +637,7 @@ def build_html(default_query: str) -> str:
       const o3Label = lv(d.current.ozone,[60,100,150],['좋음','보통','나쁨','매우나쁨']);
       const no2Label = lv(d.current.no2,[40,80,180],['좋음','보통','나쁨','매우나쁨']);
       const laundry = laundryHint(d);
-      const rowsH = d.hourly.map(h=>`<div class='hrow ${{h.warn?'warn':''}} ${{h.hail?'hail':''}}'><div style='font-weight:900;font-size:15px;color:#dbe7f7'>${{h.time}}</div><div style='font-weight:900;font-size:15px'>${{h.temp}}°</div><div>${{h.hail?'우박 ⛈️':h.type}}</div><div style='text-align:right;color:${{rainColor(h.rain)}};font-weight:900'>${{h.rain}}%</div><div style='text-align:right'>${{windFmt(h.wind)}}</div><div style='text-align:right'>${{h.cloudText}}</div><div style='text-align:right'>${{h.isHigh?'최고':''}} ${{h.isLow?'최저':''}}</div></div>`).join('');
+      const rowsH = d.hourly.map(h=>`<div class='hourCard ${{h.warn?'hourWarn':''}} ${{h.isHigh||h.isLow?'hourPeak':''}}'><div class='hourTop'><div class='hourTime'>${{h.time}}</div><div class='hourBadge'>${{h.isHigh?'최고':h.isLow?'최저':'예보'}}</div></div><div class='hourTemp'>${{h.temp}}°</div><div class='hourType'>${{h.hail?'우박 ⛈️':h.type}} · ${{h.cloudText}}</div><div class='hourMetaRow'><span>강수</span><span style='color:${{rainColor(h.rain)}}'>${{h.rain}}%</span></div><div class='hourMetaRow'><span>바람</span><span>${{windFmt(h.wind)}}</span></div></div>`).join('');
       const rowsW = d.weekly.map(w=>`<div class='wrow ${{w.best?'best':''}}'><div><b style='font-size:15px'>${{w.day}}</b><div style='font-size:13px;color:#b8c7da;font-weight:700'>${{w.dateText}} (${{w.dow}})</div></div><div style='font-size:36px;line-height:1'>${{w.icon}}</div><div>${{w.state}}</div><div style='text-align:right;font-weight:700'>${{w.high}}° / ${{w.low}}°</div><div style='text-align:right;color:${{rainColor(w.rain)}};font-weight:800'>강수 ${{w.rain}}%</div><div>${{w.alerts.join(' · ')||'-'}}</div><div class='activityWrap'><span class='activityBadge ${{w.trek?'activityOk':'activityNo'}}'><span class='e'>🥾</span>${{w.trek?'트레킹 가능':'트레킹 주의'}}</span><span class='activityBadge ${{w.run?'activityOk':'activityNo'}}'><span class='e'>🏃</span>${{w.run?'러닝 가능':'러닝 주의'}}</span>${{w.best?" <span class='activityBadge activityBest'><span class='e'>⭐</span>베스트</span>":''}}</div></div>`).join('');
       const favOn = FAVORITES.includes(d.location);
       const advisories = [];
@@ -678,7 +709,7 @@ def build_html(default_query: str) -> str:
           <div class='summary'>${{weekSummaryHtml(d.weekly)}}</div>
         </div>
         <div class='tabbar'><button class='tabbtn on' data-t='d'>⏰ 일간</button><button class='tabbtn' data-t='w'>📅 주간</button></div>
-        <div class='tab on' id='td'><div class='card'><div class='miniCharts'><div class='tile'><div>기온 흐름</div><div class='chart' id='c1'></div><div id='m1'></div></div><div class='tile'><div>강수확률</div><div class='chart' id='c2'></div><div id='m2'></div></div></div>${{rowsH}}</div></div>
+        <div class='tab on' id='td'><div class='card'><div class='miniCharts'><div class='tile'><div>기온 흐름</div><div class='chart' id='c1'></div><div id='m1'></div></div><div class='tile'><div>강수확률</div><div class='chart' id='c2'></div><div id='m2'></div></div></div><div class='hourStrip'>${{rowsH}}</div></div></div>
         <div class='tab' id='tw'><div class='card'><div class='miniCharts'><div class='tile'><div>최고기온 추세</div><div class='chart' id='c3'></div><div id='m3'></div></div><div class='tile'><div>강수확률 추세</div><div class='chart' id='c4'></div><div id='m4'></div></div></div>${{rowsW}}</div></div>
         <div class='foot'>상단 지역 입력창에서 바꾸면 아래 전체가 즉시 업데이트됩니다.</div>`;
 
