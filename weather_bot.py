@@ -1,0 +1,826 @@
+﻿import argparse
+import json
+import os
+import subprocess
+import sys
+import webbrowser
+from pathlib import Path
+
+HTML_FILE = "weather_report.html"
+INDEX_FILE = "index.html"
+
+TRAIL_PRESETS = {
+    "태백": {"name": "태백시", "lat": 37.17, "lon": 128.98},
+    "태백시": {"name": "태백시", "lat": 37.17, "lon": 128.98},
+    "해파랑길": {"name": "해파랑길(강릉 구간)", "lat": 37.7519, "lon": 128.8761},
+    "해파랑27번길": {"name": "태백시", "lat": 37.17, "lon": 128.98},
+    "한라산 성판악": {"name": "한라산 성판악 코스", "lat": 33.3869, "lon": 126.6204},
+    "북한산 백운대": {"name": "북한산 백운대 코스", "lat": 37.6586, "lon": 126.9800},
+}
+
+TRAIL_ALIASES = {
+    "해파랑 27번길": {"name": "태백시", "lat": 37.17, "lon": 128.98},
+    "해파랑27": {"name": "태백시", "lat": 37.17, "lon": 128.98},
+    "해파랑길 27": {"name": "태백시", "lat": 37.17, "lon": 128.98},
+    "해파랑27길": {"name": "태백시", "lat": 37.17, "lon": 128.98},
+    "북한산 둘레길": {"name": "북한산 백운대 코스", "lat": 37.6586, "lon": 126.9800},
+    "성판악 코스": {"name": "한라산 성판악 코스", "lat": 33.3869, "lon": 126.6204},
+    "서울": {"name": "서울특별시", "lat": 37.5665, "lon": 126.9780},
+    "부산": {"name": "부산광역시", "lat": 35.1796, "lon": 129.0756},
+    "대구": {"name": "대구광역시", "lat": 35.8714, "lon": 128.6014},
+    "인천": {"name": "인천광역시", "lat": 37.4563, "lon": 126.7052},
+    "광주": {"name": "광주광역시", "lat": 35.1595, "lon": 126.8526},
+    "대전": {"name": "대전광역시", "lat": 36.3504, "lon": 127.3845},
+    "울산": {"name": "울산광역시", "lat": 35.5384, "lon": 129.3114},
+    "제주": {"name": "제주시", "lat": 33.4996, "lon": 126.5312},
+    "제주도": {"name": "제주특별자치도", "lat": 33.3846, "lon": 126.5535},
+    "제주특별자치도": {"name": "제주특별자치도", "lat": 33.3846, "lon": 126.5535},
+    "정선": {"name": "정선군", "lat": 37.3806, "lon": 128.6609},
+    "정선군": {"name": "정선군", "lat": 37.3806, "lon": 128.6609},
+}
+
+
+def parse_args() -> argparse.Namespace:
+    p = argparse.ArgumentParser()
+    p.add_argument("--query", default="태백", help="초기 지역명")
+    return p.parse_args()
+
+
+def build_html(default_query: str) -> str:
+    q = json.dumps(default_query, ensure_ascii=True)
+    presets = json.dumps(TRAIL_PRESETS, ensure_ascii=True)
+    aliases = json.dumps(TRAIL_ALIASES, ensure_ascii=True)
+    return f"""<!doctype html>
+<html lang=\"ko\">
+<head>
+  <meta charset=\"utf-8\" />
+  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" />
+  <title>Weather Dashboard</title>
+  <style>
+    :root{{--bg:#0f172a;--bg2:#1d4ed8;--card:rgba(255,255,255,.09);--line:rgba(255,255,255,.20);--txt:#f8fbff;--mut:#a8bdd6}}
+    *{{box-sizing:border-box}} body{{margin:0;color:var(--txt);font-family:"Noto Sans KR","Malgun Gothic",sans-serif;background:
+      radial-gradient(700px 360px at 12% -12%,rgba(59,130,246,.28),transparent 62%),
+      radial-gradient(620px 300px at 86% 0%,rgba(14,165,233,.20),transparent 62%),
+      linear-gradient(145deg,#0f172a,#1e293b,#0b3a53);transition:background 1s ease}}
+    body.morning{{background:
+      radial-gradient(800px 400px at 10% -14%,rgba(56,189,248,.30),transparent 62%),
+      radial-gradient(500px 280px at 85% 0%,rgba(148,163,184,.22),transparent 64%),
+      linear-gradient(140deg,#1e293b,#155e75,#1d4ed8)}}
+    body.day{{background:
+      radial-gradient(780px 390px at 10% -12%,rgba(14,165,233,.28),transparent 60%),
+      radial-gradient(540px 300px at 85% -4%,rgba(59,130,246,.22),transparent 60%),
+      linear-gradient(140deg,#0f172a,#0f4c81,#1e3a8a)}}
+    body.evening{{background:
+      radial-gradient(760px 380px at 12% -12%,rgba(245,158,11,.32),transparent 60%),
+      radial-gradient(520px 280px at 86% 0%,rgba(30,64,175,.25),transparent 62%),
+      linear-gradient(140deg,#111827,#1e3a8a,#334155)}}
+    body.night{{background:
+      radial-gradient(760px 360px at 12% -10%,rgba(59,130,246,.24),transparent 62%),
+      radial-gradient(560px 300px at 85% 0%,rgba(15,23,42,.55),transparent 62%),
+      linear-gradient(140deg,#020617,#0f172a,#1e293b)}}
+    .wrap{{max-width:980px;margin:0 auto;padding:14px}} .card{{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px;transition:transform .2s ease,border-color .2s ease,box-shadow .2s ease;animation:cardIn .45s ease both}}
+    .card:hover{{transform:translateY(-2px);border-color:rgba(255,255,255,.24);box-shadow:0 8px 24px rgba(15,23,42,.35)}}
+    .head{{text-align:center;margin-bottom:8px;position:relative;overflow:visible}} .meta{{font-size:10px;color:#6f8299;letter-spacing:.16em}} h1{{margin:4px 0;font-size:24px}} .sub{{font-size:14px;font-weight:700;color:#c7d6ea}}
+    .utility{{display:flex;gap:6px;justify-content:center;flex-wrap:wrap;margin-top:6px}}
+    .utilBtn{{border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.08);color:#dbeafe;border-radius:999px;padding:5px 10px;font-size:12px;font-weight:800;cursor:pointer}}
+    .nearby{{display:flex;gap:6px;overflow:auto;padding:6px 2px 2px;margin-top:4px}}
+    .nearChip{{border:1px solid rgba(255,255,255,.2);background:rgba(2,6,23,.35);color:#dbeafe;border-radius:999px;padding:5px 10px;font-size:12px;font-weight:800;white-space:nowrap;cursor:pointer}}
+    .legend{{margin-top:8px;padding:8px;border-radius:10px;border:1px solid rgba(255,255,255,.14);background:rgba(2,6,23,.28)}}
+    .legendRow{{display:flex;flex-wrap:wrap;gap:6px}}
+    .legendItem{{padding:4px 8px;border-radius:999px;background:rgba(255,255,255,.08);font-size:12px;font-weight:700}}
+    .favs{{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px;justify-content:center}}
+    .favTag{{border:1px solid rgba(251,191,36,.5);background:rgba(251,191,36,.14);color:#fde68a;border-radius:999px;padding:4px 9px;font-size:12px;font-weight:800;cursor:pointer}}
+    .skyBuddy{{position:absolute;right:4px;top:-8px;font-size:42px;filter:drop-shadow(0 6px 14px rgba(0,0,0,.35));animation:flyLoop 5.5s ease-in-out infinite;z-index:3}}
+    .brandTag{{position:absolute;right:0;top:46px;font-size:13px;font-weight:900;color:#dbeafe;letter-spacing:.02em;background:rgba(15,23,42,.45);border:1px solid rgba(147,197,253,.45);padding:4px 8px;border-radius:999px;backdrop-filter:blur(6px)}}
+    .sparkle{{position:absolute;pointer-events:none;font-size:14px;color:#fde68a;opacity:.9}}
+    .s1{{left:8px;top:-2px;animation:twinkle 1.8s ease-in-out infinite}}
+    .s2{{left:38px;top:18px;animation:twinkle 2.1s ease-in-out infinite .4s}}
+    .s3{{right:56px;top:20px;animation:twinkle 1.9s ease-in-out infinite .2s}}
+    .topSearch{{display:flex;justify-content:center;gap:6px;align-items:center;margin:5px 0;flex-wrap:wrap}}
+    .input{{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.18);color:#ecf4ff;border-radius:8px;padding:8px 10px;min-width:280px}}
+    .dateInput{{min-width:180px}}
+    .btn{{border:0;border-radius:8px;padding:8px 12px;background:rgba(59,130,246,.28);color:#bfdbfe;font-weight:700;cursor:pointer;transition:transform .15s ease,background .2s ease}}
+    .btn:hover{{transform:translateY(-1px) scale(1.02);background:rgba(59,130,246,.38)}}
+    .mini{{border:0;border-radius:8px;padding:4px 8px;background:rgba(255,255,255,.1);color:#d2deed;cursor:pointer;font-size:11px;transition:transform .15s ease,background .2s ease}}
+    .mini:hover{{transform:translateY(-1px);background:rgba(255,255,255,.18)}}
+    .row{{display:grid;grid-template-columns:1fr;gap:8px}}
+    .heroRow{{display:grid;grid-template-columns:1.2fr .8fr;gap:10px;align-items:center}}
+    .temp{{font-size:64px;font-weight:900;line-height:.92}}
+    .hero{{font-size:92px;text-align:center;animation:heroBob 2.8s ease-in-out infinite;filter:drop-shadow(0 6px 12px rgba(0,0,0,.25))}}
+    .heroMeta{{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}}
+    .heroTag{{display:inline-flex;align-items:center;padding:6px 10px;border-radius:999px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.16);font-size:14px;font-weight:800;color:#dbeafe}}
+    .sunTag{{gap:6px;padding:7px 12px}}
+    .sunTag strong{{font-size:12px;letter-spacing:.04em;color:#e2e8f0}}
+    .sunriseTag{{background:linear-gradient(90deg,rgba(251,191,36,.18),rgba(251,146,60,.14));border-color:rgba(251,191,36,.34);color:#fde68a}}
+    .sunsetTag{{background:linear-gradient(90deg,rgba(244,114,182,.16),rgba(96,165,250,.14));border-color:rgba(244,114,182,.28);color:#fbcfe8}}
+    .heroSub{{font-size:17px;color:#dbe7f7;font-weight:800}}
+    .quick{{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:8px}}
+    .qcard{{display:flex;flex-direction:column;gap:4px}}
+    .qemoji{{font-size:30px;line-height:1;animation:wiggle 2.6s ease-in-out infinite}}
+    .qtitle{{font-size:14px;color:#c7d6ea;font-weight:800}}
+    .qvalue{{font-size:30px;font-weight:900;line-height:1.05}}
+    .qnote{{font-size:12px;color:#9db0c8;font-weight:700}}
+    .chip{{display:inline-block;border-radius:999px;padding:6px 12px;font-size:15px;font-weight:900;letter-spacing:.01em;line-height:1;box-shadow:inset 0 0 0 1px rgba(255,255,255,.18);text-shadow:0 1px 1px rgba(0,0,0,.35);animation:chipPulse 1.8s ease-in-out infinite}}
+    .g{{background:linear-gradient(90deg,rgba(16,185,129,.26),rgba(52,211,153,.22));color:#d1fae5}}
+    .m{{background:linear-gradient(90deg,rgba(245,158,11,.26),rgba(251,191,36,.22));color:#fef3c7}}
+    .b{{background:linear-gradient(90deg,rgba(239,68,68,.30),rgba(244,63,94,.24));color:#ffe4e6}}
+    .tabbar{{display:flex;gap:6px;margin:8px 0}} .tabbtn{{flex:1;border:0;border-radius:8px;padding:8px 0;background:rgba(255,255,255,.08);color:#9db0c8;font-weight:700;cursor:pointer;transition:all .2s ease}} .tabbtn:hover{{transform:translateY(-1px)}} .tabbtn.on{{background:rgba(251,146,60,.2);color:#fed7aa;box-shadow:inset 0 0 0 1px rgba(251,191,36,.35)}}
+    .tab{{display:none;opacity:0;transform:translateY(4px)}} .tab.on{{display:block;opacity:1;transform:translateY(0);animation:tabIn .28s ease both}}
+    .miniCharts{{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:7px}} .tile{{border:1px solid rgba(255,255,255,.1);border-radius:8px;padding:6px;background:rgba(255,255,255,.03);position:relative;overflow:hidden}} .chart{{height:110px}}
+    .chartMeta{{margin-top:6px;display:flex;gap:6px;overflow-x:auto;padding-bottom:2px}}
+    .metaChip{{flex:0 0 auto;border:1px solid rgba(255,255,255,.18);background:rgba(15,23,42,.35);border-radius:999px;padding:4px 8px;font-size:12px;font-weight:800;color:#dbeafe;white-space:nowrap}}
+    .metaChip b{{color:#fde68a}}
+    .hrow{{display:grid;grid-template-columns:64px 56px 1fr 60px 66px 70px 72px;gap:6px;align-items:center;padding:7px 6px;border-top:1px dashed rgba(255,255,255,.08);font-size:13px}} .hrow:first-child{{border-top:none}}
+    .wrow{{display:grid;grid-template-columns:72px 46px 74px 90px 74px 1fr 184px;gap:6px;align-items:center;padding:7px 6px;border-top:1px dashed rgba(255,255,255,.08);font-size:13px}} .wrow:first-child{{border-top:none}}
+    .activityWrap{{display:flex;gap:6px;justify-content:flex-end;flex-wrap:wrap}}
+    .activityBadge{{display:inline-flex;align-items:center;gap:5px;padding:6px 10px;border-radius:999px;font-size:14px;font-weight:900;line-height:1;border:1px solid rgba(255,255,255,.18);text-shadow:0 1px 1px rgba(0,0,0,.35)}}
+    .activityBadge .e{{font-size:18px;line-height:1}}
+    .activityOk{{background:linear-gradient(90deg,rgba(16,185,129,.25),rgba(74,222,128,.2));color:#d1fae5}}
+    .activityNo{{background:linear-gradient(90deg,rgba(239,68,68,.28),rgba(244,63,94,.22));color:#ffe4e6}}
+    .activityBest{{background:linear-gradient(90deg,rgba(245,158,11,.28),rgba(250,204,21,.22));color:#fef3c7}}
+    .summary{{margin-top:8px;padding:10px 11px;border-radius:10px;background:rgba(14,165,233,.14);border:1px solid rgba(125,211,252,.38);font-size:16px;line-height:1.55;font-weight:600;color:#e0f2fe;letter-spacing:.01em}}
+    .summaryLine{{margin-top:6px}}
+    .summaryLine:first-child{{margin-top:0}}
+    .summaryTrek{{margin-top:10px;padding:12px 14px;border-radius:12px;background:linear-gradient(90deg,rgba(251,191,36,.24),rgba(249,115,22,.18));border:1px solid rgba(253,186,116,.55);font-size:20px;line-height:1.45;font-weight:900;color:#fff7d6;box-shadow:0 10px 24px rgba(120,53,15,.18)}}
+    .advisory{{margin-top:8px;padding:8px 10px;border-radius:10px;border:1px solid rgba(248,113,113,.35);background:rgba(127,29,29,.22);display:flex;gap:6px;flex-wrap:wrap}}
+    .fun{{margin-top:8px;padding:14px 16px;border-radius:12px;background:linear-gradient(90deg,rgba(251,191,36,.16),rgba(236,72,153,.14));border:1px solid rgba(251,191,36,.35);font-size:19px;line-height:1.72;font-weight:800;letter-spacing:.03em;color:#fde68a;animation:pulseFun 2.2s ease-in-out infinite}}
+    .funLabel{{display:block;margin-bottom:6px;font-size:12px;font-weight:900;letter-spacing:.16em;color:#fff1b3}}
+    .outfit{{margin-top:8px;padding:10px 11px;border-radius:10px;background:linear-gradient(90deg,rgba(74,222,128,.14),rgba(56,189,248,.12));border:1px solid rgba(134,239,172,.32)}}
+    .outfit b{{font-size:15px;color:#dcfce7}}
+    .outfit p{{margin:4px 0 0;font-size:14px;line-height:1.5;color:#eafff3;font-weight:700}}
+    .outfitSplit{{margin-top:8px;padding-top:8px;border-top:1px dashed rgba(255,255,255,.16)}}
+    .outfitSplit b{{display:block;font-size:14px;color:#fef3c7}}
+    .outfitSplit p{{margin:4px 0 0;font-size:14px;line-height:1.5;color:#fff7d6;font-weight:700}}
+    .microEmoji{{font-size:22px;display:inline-block;animation:wiggle 2.4s ease-in-out infinite}}
+    .bgFun{{position:fixed;inset:0;pointer-events:none;z-index:0}}
+    .floatie{{position:absolute;font-size:20px;opacity:.12;animation:drift 20s linear infinite}}
+    .f1{{left:6%;top:72%;animation-duration:16s}}
+    .f2{{left:82%;top:68%;animation-duration:15s}}
+    .mascot{{position:absolute;font-size:38px;line-height:1;filter:drop-shadow(0 8px 16px rgba(0,0,0,.25));opacity:.92}}
+    .m1{{left:3%;top:18%;animation:mascotHop 3.4s ease-in-out infinite}}
+    .m2{{right:4%;top:14%;animation:mascotHop 3.8s ease-in-out infinite .3s}}
+    @keyframes cardIn{{from{{opacity:0;transform:translateY(8px)}}to{{opacity:1;transform:translateY(0)}}}}
+    @keyframes tabIn{{from{{opacity:0;transform:translateY(6px)}}to{{opacity:1;transform:translateY(0)}}}}
+    @keyframes heroBob{{0%,100%{{transform:translateY(0) rotate(0deg) scale(1)}}50%{{transform:translateY(-3px) rotate(-2deg) scale(1.04)}}}}
+    @keyframes flyLoop{{0%,100%{{transform:translate(0,0) rotate(0deg)}}25%{{transform:translate(-8px,-6px) rotate(-6deg)}}50%{{transform:translate(3px,-11px) rotate(4deg)}}75%{{transform:translate(-4px,-5px) rotate(-3deg)}}}}
+    @keyframes twinkle{{0%,100%{{opacity:.2;transform:scale(.7)}}50%{{opacity:1;transform:scale(1.2)}}}}
+    @keyframes pulseFun{{0%,100%{{transform:scale(1)}}50%{{transform:scale(1.01)}}}}
+    @keyframes wiggle{{0%,100%{{transform:rotate(0)}}25%{{transform:rotate(-8deg)}}75%{{transform:rotate(8deg)}}}}
+    @keyframes drift{{0%{{transform:translateY(0) translateX(0)}}50%{{transform:translateY(-120px) translateX(20px)}}100%{{transform:translateY(-260px) translateX(-10px)}}}}
+    @keyframes drawLine{{to{{stroke-dashoffset:0}}}}
+    @keyframes growBar{{from{{transform:scaleY(0);transform-origin:bottom}}to{{transform:scaleY(1);transform-origin:bottom}}}}
+    @keyframes chipPulse{{0%,100%{{transform:translateY(0) scale(1)}}50%{{transform:translateY(-1px) scale(1.05)}}}}
+    @keyframes mascotHop{{0%,100%{{transform:translateY(0) rotate(0)}}50%{{transform:translateY(-8px) rotate(-6deg)}}}}
+    @keyframes mascotFloat{{0%,100%{{transform:translateY(0) translateX(0)}}50%{{transform:translateY(-10px) translateX(8px)}}}}
+    @keyframes mascotSpin{{0%,100%{{transform:rotate(0) scale(1)}}50%{{transform:rotate(8deg) scale(1.1)}}}}
+    .foot{{margin-top:8px;text-align:center;color:#556a82;font-size:10px}}
+    @media (max-width:760px){{
+      .wrap{{padding:10px}}
+      .row,.miniCharts{{grid-template-columns:1fr}}
+      .quick{{grid-template-columns:1fr 1fr}}
+      .heroRow{{grid-template-columns:1fr}}
+      .hero{{font-size:72px;text-align:center;animation:none}}
+      .topSearch{{flex-direction:column;align-items:stretch}}
+      .input,.dateInput,.btn{{width:100%;min-width:0;font-size:16px}}
+      .btn{{padding:11px 12px}}
+      .tabbtn{{padding:11px 0;font-size:15px}}
+      .chip{{font-size:14px;padding:6px 10px}}
+      .activityBadge{{font-size:12px;padding:5px 8px}}
+      .activityBadge .e{{font-size:15px}}
+      .brandTag{{position:static;display:inline-block;margin-top:6px}}
+      .bgFun,.sparkle{{display:none}}
+      .skyBuddy{{position:static;display:block;margin:0 auto 4px;animation:none}}
+      .hrow,.wrow{{display:flex;flex-wrap:wrap;gap:5px;font-size:12px;padding:8px 0}}
+      .hrow>div,.wrow>div{{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.10);border-radius:8px;padding:4px 6px}}
+      .hrow>div:nth-child(1),.wrow>div:nth-child(1){{font-weight:900}}
+      .hrow>div:nth-child(3),.wrow>div:nth-child(6){{flex:1 1 100%}}
+      .summary{{font-size:15px;line-height:1.5}}
+      .summaryTrek{{font-size:18px;line-height:1.4}}
+      .fun{{font-size:17px;line-height:1.65;padding:13px 14px}}
+      .utility,.favs{{justify-content:flex-start}}
+      .nearby{{padding-bottom:4px}}
+      .chart{{height:120px}}
+      .chartMeta{{gap:4px}}
+      .metaChip{{font-size:11px;padding:4px 7px}}
+      .qvalue{{font-size:24px}}
+      .temp{{font-size:54px;text-align:center}}
+      .heroSub{{font-size:16px;text-align:center}}
+      .heroMeta{{justify-content:center}}
+    }}
+    @media (prefers-reduced-motion: reduce){{
+      *{{animation:none !important;transition:none !important}}
+    }}
+  </style>
+</head>
+<body>
+  <div class=\"wrap\" id=\"app\"><div class='card'>대시보드 로딩 중...</div></div>
+  <script>
+    const DEFAULT_QUERY = {q};
+    const TRAIL_PRESETS = {presets};
+    const TRAIL_ALIASES = {aliases};
+    const app = document.getElementById('app');
+    let S = null;
+    let SELECTED_DATE = null;
+    let WIND_UNIT = 'm/s';
+    const FAVORITE_KEY = 'weather_dash_favs_v1';
+    let FAVORITES = [];
+    const NEARBY_SPOTS = ['정선군','영월군','제천시','원주시','삼척시','동해시','강릉시','울진군','양양군','속초시'];
+    const showFatal = (title, detail='') => {{
+      const safe = String(detail || '').replace(/[<>&]/g, s => ({{'<':'&lt;','>':'&gt;','&':'&amp;'}}[s]));
+      app.innerHTML = `<div class='card' style='background:rgba(239,68,68,.14);border-color:rgba(248,113,113,.55);color:#fee2e2'>
+        <div style='font-size:18px;font-weight:900;margin-bottom:8px'>${{title}}</div>
+        <div style='font-size:13px;font-weight:700;line-height:1.5'>${{safe || '알 수 없는 오류'}}</div>
+        <div style='margin-top:8px;font-size:12px;color:#fecaca'>file:// 환경에서 API 요청이 막히면 Python 로컬 서버(\"python -m http.server\")로 실행해보세요.</div>
+      </div>`;
+    }};
+    window.addEventListener('error', (e) => showFatal('화면 렌더링 오류', e.message || 'script error'));
+    window.addEventListener('unhandledrejection', (e) => showFatal('데이터 로딩 오류', e.reason?.message || e.reason || 'promise rejection'));
+
+    const lv = (v,c,l)=>{{for(let i=0;i<c.length;i++) if(v<=c[i]) return l[i]; return l[l.length-1];}};
+    const chip = (t)=>`<span class='chip ${{(t==='좋음'||t==='낮음'||t==='약함')?'g':(t==='보통'||t==='높음')?'m':'b'}}'>${{t}}</span>`;
+    const windFmt = v => WIND_UNIT==='km/h' ? `${{(v*3.6).toFixed(1)}}km/h` : `${{v}}m/s`;
+    const rainColor = v => v>=60?'#f87171':v>=30?'#fbbf24':'#34d399';
+    const stateByCode = c => (c===0||c===1)?'맑음':(c===2)?'구름조금':([3,45,48].includes(c))?'흐림':([96,99,95].includes(c))?'뇌우':([71,73,75,77,85,86].includes(c))?'눈':'비';
+    const iconByCode = c => ([96,99,95].includes(c))?'⛈️':([71,73,75,77,85,86].includes(c))?'❄️':([56,57,66,67,80,81,82].includes(c))?'🌧️':([1,2].includes(c))?'⛅':([3,45,48].includes(c))?'☁️':'☀️';
+    const pType = (c,r,s)=> (c===96||c===99)?'우박':([68,69].includes(c)||(s>0&&r>0))?'진눈깨비':s>0?'눈':r>0?'비':'없음';
+    const normalizeDisplayName = (raw, query, result=null) => {{
+      const r = (raw || '').trim();
+      const q = (query || '').trim();
+      const hasAdminSuffix = /(특별시|광역시|특별자치시|특별자치도|시|군|구|읍|면|동|리|도)$/.test(q);
+      if (q.includes('태백') || r === '태백' || r.includes('태백')) return '태백시';
+      if (q.includes('정선')) return '정선군';
+      if (q.includes('제주도') || q.includes('제주특별자치도')) return '제주특별자치도';
+      if (hasAdminSuffix) return q;
+
+      const adminCandidates = [result?.admin3, result?.admin2, result?.admin1]
+        .map(x => String(x || '').trim())
+        .filter(Boolean);
+      const pickedAdmin = adminCandidates.find(x => /(특별시|광역시|특별자치시|특별자치도|시|군|구|읍|면|동|리|도)$/.test(x));
+      if (pickedAdmin) return pickedAdmin;
+
+      // 시청/군청/구청 등 기관명으로 잡히면 행정단위명으로 보정
+      const officeFixed = r
+        .replace(/특별자치도청$/, '특별자치도')
+        .replace(/특별자치시청$/, '특별자치시')
+        .replace(/광역시청$/, '광역시')
+        .replace(/특별시청$/, '특별시')
+        .replace(/시청$/, '시')
+        .replace(/군청$/, '군')
+        .replace(/구청$/, '구');
+      if (/(특별시|광역시|특별자치시|특별자치도|시|군|구)$/.test(officeFixed)) return officeFixed;
+      if (/(특별시|광역시|특별자치시|특별자치도|시|군|구|읍|면|동|리|도)$/.test(r)) return r;
+      return r || q;
+    }};
+
+    function matchTrailPreset(q){{
+      const raw=(q||'').trim();
+      if(!raw) return null;
+      const key=raw.replace(/\\s+/g,'').toLowerCase();
+      if(TRAIL_PRESETS[raw]) return TRAIL_PRESETS[raw];
+      if(TRAIL_ALIASES[raw]) return TRAIL_ALIASES[raw];
+      for(const [k,v] of Object.entries(TRAIL_PRESETS)){{
+        const kk=k.replace(/\\s+/g,'').toLowerCase();
+        if(key.includes(kk) || kk.includes(key)) return v;
+      }}
+      for(const [k,v] of Object.entries(TRAIL_ALIASES)){{
+        const kk=k.replace(/\\s+/g,'').toLowerCase();
+        if(key.includes(kk) || kk.includes(key)) return v;
+      }}
+      if(key.includes('해파랑') && (key.includes('27') || key.includes('27번'))) return TRAIL_ALIASES['해파랑27'];
+      if(key.includes('태백')) return TRAIL_PRESETS['태백시'];
+      return null;
+    }}
+
+    function adminQueryVariants(q){{
+      const t=(q||'').trim();
+      const compact=t.replace(/\\s+/g,'');
+      const variants = new Set([t, compact]);
+      const suffixes = ['특별시','광역시','특별자치시','특별자치도','도','시','군','구','읍','면','동','리'];
+      const hasSuffix = suffixes.some(s => compact.endsWith(s));
+      if(!hasSuffix) {{
+        variants.add(`${{compact}}시`);
+        variants.add(`${{compact}}군`);
+        variants.add(`${{compact}}구`);
+        variants.add(`${{compact}}동`);
+      }}
+      variants.add(`대한민국 ${{t}}`);
+      variants.add(`한국 ${{t}}`);
+      return [...variants].filter(Boolean);
+    }}
+
+    function pickBestResult(results, query){{
+      const q = (query||'').replace(/\\s+/g,'').toLowerCase();
+      const korean = results.filter(r => (r.country_code || '').toUpperCase() === 'KR');
+      const pool = korean.length ? korean : results;
+      const scored = pool.map(r => {{
+        const name = String(r.name||'').replace(/\\s+/g,'').toLowerCase();
+        const a1 = String(r.admin1||'').replace(/\\s+/g,'').toLowerCase();
+        const a2 = String(r.admin2||'').replace(/\\s+/g,'').toLowerCase();
+        const a3 = String(r.admin3||'').replace(/\\s+/g,'').toLowerCase();
+        let score = 0;
+        if(name === q) score += 120;
+        if(name.startsWith(q) || q.startsWith(name)) score += 80;
+        if(a3.includes(q)) score += 60;
+        if(a2.includes(q)) score += 45;
+        if(a1.includes(q)) score += 30;
+        if((r.feature_code || '').startsWith('ADM')) score += 15; // 행정단위 우선
+        if((r.country_code || '').toUpperCase() === 'KR') score += 10;
+        return {{r, score}};
+      }}).sort((x,y)=>y.score-x.score);
+      return scored[0]?.r || results[0];
+    }}
+
+    const spark = (arr, labels, color, mode='line') => {{
+      const w=360,h=110,p=14; if(!arr.length) return '';
+      const min=Math.min(...arr), max=Math.max(...arr), span=Math.max(1,max-min);
+      const step=(w-p*2)/Math.max(1,arr.length-1);
+      const gridV = labels.map((_,i)=>`<line x1='${{p+i*step}}' y1='${{p}}' x2='${{p+i*step}}' y2='${{h-p}}' stroke='rgba(255,255,255,.08)'/>`).join('');
+      let body='';
+      if(mode==='bar'){{
+        const bw=Math.max(3,step-4), maxv=Math.max(1,...arr);
+        body=arr.map((v,i)=>{{const bh=(v/maxv)*(h-p*2), x=p+i*step-bw/2, y=h-p-bh; return `<rect x='${{x}}' y='${{y}}' width='${{bw}}' height='${{bh}}' rx='2' fill='${{color}}' style='animation:growBar .6s ease both;animation-delay:${{i*0.07}}s'/>`;}}).join('');
+        body += `<defs><marker id='arrowHeadBar' markerWidth='9' markerHeight='7' refX='7' refY='3.5' orient='auto'><polygon points='0 0, 9 3.5, 0 7' fill='${{color}}'/></marker></defs>`;
+        body += `<line x1='${{p}}' y1='${{h-p+1}}' x2='${{w-p+2}}' y2='${{h-p+1}}' stroke='${{color}}' stroke-width='1.8' marker-end='url(#arrowHeadBar)' style='opacity:.85;stroke-dasharray:420;stroke-dashoffset:420;animation:drawLine 1.1s ease forwards'/>`;
+      }} else {{
+        if(arr.length < 2){{
+          const cy = h-p-((arr[0]-min)/span)*(h-p*2);
+          body = `<circle cx='${{p}}' cy='${{cy}}' r='4' fill='${{color}}'/>`;
+        }} else {{
+          const pts=arr.map((v,i)=>`${{p+i*step}},${{h-p-((v-min)/span)*(h-p*2)}}`).join(' ');
+          body=`<defs><marker id='arrowHead' markerWidth='10' markerHeight='8' refX='8' refY='4' orient='auto'><polygon points='0 0, 10 4, 0 8' fill='${{color}}'/></marker></defs><polyline points='${{pts}}' fill='none' stroke='${{color}}' stroke-width='3' marker-end='url(#arrowHead)' style='stroke-dasharray:520;stroke-dashoffset:520;animation:drawLine 1.2s ease forwards'/><circle r='4' fill='${{color}}' style='filter:drop-shadow(0 0 6px ${{color}})'><animateMotion dur='1.2s' fill='freeze' path='M${{pts.replace(/ /g,' L')}}'/></circle>`;
+        }}
+      }}
+      return `<svg viewBox='0 0 ${{w}} ${{h}}' width='100%' height='100%'>${{gridV}}${{body}}</svg>`;
+    }};
+
+    const chartMeta = (labels, values, unit='') => {{
+      return `<div class='chartMeta'>${{labels.map((lb,i)=>`<span class='metaChip'>${{lb}} <b>${{values[i]}}${{unit}}</b></span>`).join('')}}</div>`;
+    }};
+
+    function applyTimeTheme(){{
+      const h = new Date().getHours();
+      document.body.classList.remove('morning','day','evening','night');
+      if(h>=6 && h<10) document.body.classList.add('morning');
+      else if(h>=10 && h<17) document.body.classList.add('day');
+      else if(h>=17 && h<21) document.body.classList.add('evening');
+      else document.body.classList.add('night');
+    }}
+
+    async function resolveLoc(q){{
+      const t=(q||'').trim();
+      if(!t) throw new Error('지역명을 입력하세요.');
+      const guessed = matchTrailPreset(t);
+      if(guessed) return guessed;
+      const tryQueries = adminQueryVariants(t);
+      for(const name of tryQueries){{
+        const u=new URL('https://geocoding-api.open-meteo.com/v1/search');
+        u.searchParams.set('name',name);
+        u.searchParams.set('count','10');
+        u.searchParams.set('format','json');
+        u.searchParams.set('language','ko');
+        try {{
+          const r=await fetch(u);
+          if(!r.ok) continue;
+          const j=await r.json();
+          if(j?.results?.length){{
+            const x=pickBestResult(j.results, t);
+            return {{name:normalizeDisplayName(x.name, t, x), lat:Number(x.latitude), lon:Number(x.longitude)}};
+          }}
+        }} catch(_e) {{}}
+      }}
+      if(!t || t === DEFAULT_QUERY) return TRAIL_PRESETS['태백시'];
+      throw new Error('검색 결과가 없습니다.');
+    }}
+
+    async function fetchAll(loc){{
+      const f=new URL('https://api.open-meteo.com/v1/forecast');
+      f.searchParams.set('latitude',loc.lat); f.searchParams.set('longitude',loc.lon); f.searchParams.set('timezone','Asia/Seoul');
+      f.searchParams.set('current_weather','true'); f.searchParams.set('forecast_days','16');
+      f.searchParams.set('daily','weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,wind_speed_10m_max,sunrise,sunset');
+      f.searchParams.set('hourly','temperature_2m,apparent_temperature,relative_humidity_2m,precipitation_probability,rain,snowfall,weather_code,wind_speed_10m,wind_gusts_10m,uv_index,visibility,surface_pressure,dew_point_2m,cloud_cover');
+      const a=new URL('https://air-quality-api.open-meteo.com/v1/air-quality');
+      a.searchParams.set('latitude',loc.lat); a.searchParams.set('longitude',loc.lon); a.searchParams.set('timezone','Asia/Seoul'); a.searchParams.set('forecast_days','7');
+      a.searchParams.set('hourly','pm10,pm2_5,ozone,nitrogen_dioxide');
+      const fr = await fetch(f);
+      if(!fr.ok) throw new Error(`예보 API 실패 (${{fr.status}})`);
+      const forecast = await fr.json();
+      if(forecast?.error) throw new Error(`예보 API 오류: ${{forecast.reason || 'unknown'}}`);
+      let air = {{hourly: {{time: [], pm10: [], pm2_5: [], ozone: [], nitrogen_dioxide: []}}}};
+      try {{
+        const ar = await fetch(a);
+        if(ar.ok){{
+          const airJson = await ar.json();
+          if(!airJson?.error && airJson?.hourly?.time) air = airJson;
+        }}
+      }} catch (_e) {{
+        // 대기질 API 실패 시 날씨 대시보드는 계속 표시
+      }}
+      return {{forecast, air}};
+    }}
+
+    function buildState(loc, forecast, air, selectedDate){{
+      if(!forecast?.hourly?.time?.length || !forecast?.daily?.time?.length || !forecast?.current_weather?.time){{
+        throw new Error('예보 데이터 형식 오류');
+      }}
+      const h=forecast.hourly, t=h.time, nowIso=forecast.current_weather.time;
+      const hv = (k,i,d=0)=>Number((h[k]?.[i]) ?? d);
+      const todayIso = nowIso.slice(0,10);
+      const available = new Set(forecast.daily.time || []);
+      const targetDate = (selectedDate && available.has(selectedDate)) ? selectedDate : todayIso;
+      const dayIdx=t.map((x,i)=>x.startsWith(targetDate)?i:-1).filter(i=>i>=0);
+      const targetHourIdx = dayIdx.find(i=>t[i].slice(11,13)==='12') ?? dayIdx[0] ?? 0;
+      const nowIdx=t.reduce((b,x,i)=>Math.abs(new Date(x)-new Date(nowIso))<Math.abs(new Date(t[b])-new Date(nowIso))?i:b,0);
+      const idx = targetDate===todayIso ? nowIdx : targetHourIdx;
+      const code=hv('weather_code',idx,0);
+      const cur={{
+        temp:hv('temperature_2m',idx,0), feels:hv('apparent_temperature',idx,0),
+        high:Math.max(...dayIdx.map(i=>hv('temperature_2m',i,0))), low:Math.min(...dayIdx.map(i=>hv('temperature_2m',i,0))),
+        condition:stateByCode(code), conditionIcon:iconByCode(code), humidity:hv('relative_humidity_2m',idx,0),
+        wind:hv('wind_speed_10m',idx,0), gust:hv('wind_gusts_10m',idx,0), uv:hv('uv_index',idx,0),
+        visibility:hv('visibility',idx,0)/1000, pressure:hv('surface_pressure',idx,0), dewpoint:hv('dew_point_2m',idx,0),
+        rainProb:hv('precipitation_probability',idx,0), precipType:pType(code, hv('rain',idx,0), hv('snowfall',idx,0)),
+      }};
+
+      const at = air?.hourly?.time || [];
+      const ai = at.length ? at.reduce((b,x,i)=>Math.abs(new Date(x)-new Date(nowIso))<Math.abs(new Date(at[b])-new Date(nowIso))?i:b,0) : 0;
+      cur.pm10=Number(air?.hourly?.pm10?.[ai]||0); cur.pm25=Number(air?.hourly?.pm2_5?.[ai]||0); cur.ozone=Number(air?.hourly?.ozone?.[ai]||0); cur.no2=Number(air?.hourly?.nitrogen_dioxide?.[ai]||0);
+
+      const slots=dayIdx.filter(i=>{{const hh=Number(t[i].slice(11,13)); return hh>=6&&hh<=22&&hh%2===0;}});
+      const maxI=slots.reduce((a,b)=>hv('temperature_2m',b,0)>hv('temperature_2m',a,0)?b:a, slots[0]||0);
+      const minI=slots.reduce((a,b)=>hv('temperature_2m',b,0)<hv('temperature_2m',a,0)?b:a, slots[0]||0);
+      const hourly = slots.map(i=>({{time:`${{t[i].slice(11,13)}}시`, temp:hv('temperature_2m',i,0), rain:hv('precipitation_probability',i,0), type:pType(hv('weather_code',i,0),hv('rain',i,0),hv('snowfall',i,0)), wind:hv('wind_speed_10m',i,0), cloudText:hv('cloud_cover',i,0)<20?'맑음':hv('cloud_cover',i,0)<=60?'구름조금':'흐림', warn:hv('precipitation_probability',i,0)>=50, hail:[96,99].includes(hv('weather_code',i,0)), isHigh:i===maxI, isLow:i===minI}}));
+
+      const wk=['월','화','수','목','금','토','일'];
+      const dly = forecast.daily;
+      const dv = (k,i,d=0)=>Number((dly[k]?.[i]) ?? d);
+      const weekly = (dly.time||[]).map((d,i)=>{{
+        const dd=new Date(d+'T00:00:00');
+        const rain=Math.round(dv('precipitation_probability_max',i,0));
+        const wind=dv('wind_speed_10m_max',i,0);
+        const dateText = `${{dd.getMonth()+1}}/${{dd.getDate()}}`;
+        return {{date:d, day:i===0?'오늘':i===1?'내일':i===2?'모레':`${{i}}일후`, dateText, dow:wk[(dd.getDay()+6)%7], icon:iconByCode(dv('weather_code',i,0)), state:stateByCode(dv('weather_code',i,0)), high:Math.round(dv('temperature_2m_max',i,0)), low:Math.round(dv('temperature_2m_min',i,0)), rain, wind, alerts:[rain>=50?'강수높음':'',wind>=9?'강풍':''].filter(Boolean), trek:rain<50&&wind<9, run:rain<35&&wind<9, best:false}};
+      }});
+      if(!weekly.length) throw new Error('주간 예보 데이터 없음');
+      const best = weekly.reduce((bi,x,i)=> (x.rain + x.wind*3) < (weekly[bi].rain + weekly[bi].wind*3) ? i : bi, 0);
+      if(weekly[best]) weekly[best].best=true;
+      const sunriseRaw = String(dly.sunrise?.[0] || '');
+      const sunsetRaw = String(dly.sunset?.[0] || '');
+      const sunrise = sunriseRaw.includes('T') ? sunriseRaw.split('T')[1].slice(0,5) : '--:--';
+      const sunset = sunsetRaw.includes('T') ? sunsetRaw.split('T')[1].slice(0,5) : '--:--';
+
+      const now=new Date(); const ampm=now.getHours()<12?'오전':'오후'; const h12=((now.getHours()+11)%12)+1;
+      return {{
+        location:loc.name, lat:loc.lat, lon:loc.lon,
+        selectedDate: targetDate,
+        updated:`${{now.getFullYear()}}년 ${{now.getMonth()+1}}월 ${{now.getDate()}}일 ${{ampm}} ${{h12}}:${{String(now.getMinutes()).padStart(2,'0')}}`,
+        sunrise, sunset,
+        current:cur,
+        alerts:[cur.gust>=10?`돌풍 주의 (${{cur.gust.toFixed(1)}}m/s)`:null, [96,99].includes(code)?'우박 가능':null].filter(Boolean),
+        hourly, weekly,
+      }};
+    }}
+
+    function compressDateRuns(days, allDays){{
+      if(!days.length) return '';
+      const idxMap = new Map(allDays.map((d,i)=>[d.date, i]));
+      const arr = [...days]
+        .map(d=>({{...d, _i: idxMap.get(d.date)}}))
+        .filter(d=>Number.isInteger(d._i))
+        .sort((a,b)=>a._i-b._i);
+      const ranges = [];
+      let s=arr[0], p=arr[0];
+      for(let i=1;i<arr.length;i++){{
+        const c=arr[i];
+        if(c._i===p._i+1) p=c;
+        else {{ ranges.push([s,p]); s=c; p=c; }}
+      }}
+      ranges.push([s,p]);
+      return ranges.map(([a,b])=> a._i===b._i ? `${{a.dateText}}(${{a.dow}})` : `${{a.dateText}}(${{a.dow}})~${{b.dateText}}(${{b.dow}})`).join(', ');
+    }}
+
+    function weekSummaryHtml(w){{
+      const rainyDays=w.filter(x=>x.rain>=50), windyDays=w.filter(x=>x.wind>=9);
+      const trekDays=w.filter(x=>x.trek);
+      const rainy=rainyDays.length, windy=windyDays.length;
+      const best=w.find(x=>x.best)||w[0];
+      const warm=w.reduce((a,b)=> b.high>a.high?b:a, w[0]);
+      const range = `${{w[0].dateText}} ~ ${{w[w.length-1].dateText}}`;
+      let line1 = `오케이, ${{range}}는 밖에 나가기 무난한 편! 하늘 컨디션 꽤 착해 😎`;
+      if(rainy>=3) line1 = `친구야 ${{range}}는 우산이 출근하는 주간이야. 하늘 텐션이 꽤 드라마틱해 ☔`;
+      const rainRuns = compressDateRuns(rainyDays, w);
+      const windRuns = compressDateRuns(windyDays, w);
+      const trekRuns = compressDateRuns(trekDays, w);
+      const rainText = rainy===0 ? '비 걱정은 거의 없고' : `비 포인트는 ${{rainRuns}}`;
+      const windText = windy===0 ? '바람은 대체로 얌전해.' : `바람 센 날은 ${{windRuns}}니까 머리세팅 주의 😵‍💫`;
+      const line2 = `${{rainText}}, ${{windText}}`;
+      const trekText = trekDays.length ? trekRuns : '이번 주는 컨디션 보수적으로 보는 게 좋아';
+      const line3 = `가장 포근한 날은 ${{warm.dateText}}(${{warm.dow}}), 전체 베스트는 ${{best.dateText}}(${{best.dow}})!`;
+      return `
+        <div class='summaryLine'>${{line1}}</div>
+        <div class='summaryLine'>${{line2}}</div>
+        <div class='summaryLine'>${{line3}}</div>
+        <div class='summaryTrek'>🥾 트레킹 찬스: ${{trekText}}</div>
+      `;
+    }}
+
+    function outfitHint(d){{
+      const c=d.current;
+      const feels=c.feels;
+      const wet = c.rainProb>=50 || ['비','눈','진눈깨비','우박'].includes(c.precipType);
+      let main='긴팔+가벼운 아우터';
+      if(feels<=-5) main='롱패딩 + 목도리 + 장갑';
+      else if(feels<=3) main='두툼한 코트 + 니트';
+      else if(feels<=10) main='자켓/후드 + 긴팔';
+      else if(feels<=18) main='맨투맨/가디건';
+      else if(feels<=25) main='긴팔 티 or 얇은 셔츠';
+      else main='반팔 + 통풍 좋은 옷';
+      const addons=[];
+      if(wet) addons.push('우산');
+      if(c.wind>=7) addons.push('바람막이');
+      if(c.uv>=8) addons.push('모자/선크림');
+      const extra = addons.length ? ` 챙길 건 ${{addons.join(', ')}}.` : ' 소지품은 가볍게 가도 괜찮아.';
+      return `오늘은 ${{main}} 느낌으로 가자. ${{extra}}`;
+    }}
+
+    function laundryHint(d){{
+      const c = d.current;
+      let score = 0;
+      if(c.rainProb < 20) score += 2;
+      else if(c.rainProb < 50) score += 1;
+      else score -= 2;
+
+      if(c.humidity <= 55) score += 2;
+      else if(c.humidity <= 70) score += 1;
+      else if(c.humidity >= 85) score -= 2;
+
+      if(c.wind >= 2 && c.wind <= 6) score += 1;
+      else if(c.wind > 9) score -= 1;
+
+      if(c.temp >= 18 && c.temp <= 30) score += 1;
+      else if(c.temp < 5) score -= 1;
+
+      if(c.condition === '맑음' || c.condition === '구름조금') score += 1;
+      if(['비','눈','진눈깨비','우박','뇌우'].includes(c.precipType) || c.condition === '비' || c.condition === '눈' || c.condition === '뇌우') score -= 2;
+
+      let label = '보통';
+      let desc = '실내건조나 제습기 보조가 있으면 무난해요.';
+      if(score >= 5){{
+        label = '좋음';
+        desc = '빨래 말리기 좋은 편이에요. 바깥 건조도 비교적 수월합니다.';
+      }} else if(score <= 0){{
+        label = '아쉬움';
+        desc = '습도나 강수 영향이 커서 잘 안 마를 수 있어요. 실내건조를 권장합니다.';
+      }}
+
+      const risks = [];
+      if(c.rainProb >= 50) risks.push('비 가능성');
+      if(c.humidity >= 75) risks.push('습도 높음');
+      if(c.wind >= 9) risks.push('바람 강함');
+      const riskText = risks.length ? ` 주의: ${{risks.join(', ')}}.` : '';
+      return {{ label, text: `빨래 적합도는 ${{label}}. ${{desc}}${{riskText}}` }};
+    }}
+
+    function funLine(d){{
+      const c = d.current.condition;
+      if(c==='맑음') return '선글라스 출동! 오늘 하늘, 기분 점수 만점 😎';
+      if(c==='구름조금') return '구름이 양보한 날. 산책하면 사진이 잘 나와요 ☁️✨';
+      if(c==='흐림') return '하늘이 살짝 무드있네요. 따뜻한 음료 한 잔 어때요? ☕';
+      if(c==='비') return '빗방울 BGM on. 우산 챙기면 분위기 합격 ☔🎵';
+      if(c==='눈') return '눈 소식! 미끄럼만 조심하면 영화 같은 날 ❄️';
+      if(c==='뇌우') return '하늘이 강하게 말하는 날. 야외 일정은 잠깐 멈춤 ⛈️';
+      return '오늘의 하늘, 생각보다 재밌습니다. 체크 완료!';
+    }}
+
+    function loadFavs(){{
+      try{{ FAVORITES = JSON.parse(localStorage.getItem(FAVORITE_KEY) || '[]'); if(!Array.isArray(FAVORITES)) FAVORITES=[]; }}catch(_e){{ FAVORITES=[]; }}
+    }}
+    function saveFavs(){{ localStorage.setItem(FAVORITE_KEY, JSON.stringify(FAVORITES.slice(0,8))); }}
+    function toggleFav(name){{
+      const i = FAVORITES.indexOf(name);
+      if(i>=0) FAVORITES.splice(i,1); else FAVORITES.unshift(name);
+      saveFavs();
+    }}
+
+    function render(){{
+      const d=S; if(!d) return;
+      const o3Label = lv(d.current.ozone,[60,100,150],['좋음','보통','나쁨','매우나쁨']);
+      const no2Label = lv(d.current.no2,[40,80,180],['좋음','보통','나쁨','매우나쁨']);
+      const laundry = laundryHint(d);
+      const rowsH = d.hourly.map(h=>`<div class='hrow ${{h.warn?'warn':''}} ${{h.hail?'hail':''}}'><div style='font-weight:900;font-size:15px;color:#dbe7f7'>${{h.time}}</div><div style='font-weight:900;font-size:15px'>${{h.temp}}°</div><div>${{h.hail?'우박 ⛈️':h.type}}</div><div style='text-align:right;color:${{rainColor(h.rain)}};font-weight:900'>${{h.rain}}%</div><div style='text-align:right'>${{windFmt(h.wind)}}</div><div style='text-align:right'>${{h.cloudText}}</div><div style='text-align:right'>${{h.isHigh?'최고':''}} ${{h.isLow?'최저':''}}</div></div>`).join('');
+      const rowsW = d.weekly.map(w=>`<div class='wrow ${{w.best?'best':''}}'><div><b style='font-size:15px'>${{w.day}}</b><div style='font-size:13px;color:#b8c7da;font-weight:700'>${{w.dateText}} (${{w.dow}})</div></div><div style='font-size:36px;line-height:1'>${{w.icon}}</div><div>${{w.state}}</div><div style='text-align:right;font-weight:700'>${{w.high}}° / ${{w.low}}°</div><div style='text-align:right;color:${{rainColor(w.rain)}};font-weight:800'>강수 ${{w.rain}}%</div><div>${{w.alerts.join(' · ')||'-'}}</div><div class='activityWrap'><span class='activityBadge ${{w.trek?'activityOk':'activityNo'}}'><span class='e'>🥾</span>${{w.trek?'트레킹 가능':'트레킹 주의'}}</span><span class='activityBadge ${{w.run?'activityOk':'activityNo'}}'><span class='e'>🏃</span>${{w.run?'러닝 가능':'러닝 주의'}}</span>${{w.best?" <span class='activityBadge activityBest'><span class='e'>⭐</span>베스트</span>":''}}</div></div>`).join('');
+      const favOn = FAVORITES.includes(d.location);
+      const advisories = [];
+      if(d.current.rainProb>=70) advisories.push('강한 비 가능성');
+      if(d.current.gust>=10) advisories.push('돌풍 주의');
+      if(d.current.pm25>35) advisories.push('초미세먼지 주의');
+      if(d.current.uv>=8) advisories.push('자외선 매우 높음');
+
+      app.innerHTML = `
+        <div class='bgFun'>
+          <div class='floatie f1'>☁️</div>
+          <div class='mascot m1'>☁️🙂</div><div class='mascot m2'>🌤️😜</div>
+        </div>
+        <div class='head'>
+          <div class='skyBuddy'>😶‍🌫️🪽</div>
+          <div class='brandTag'>재민's weather forcast!</div>
+          <div class='sparkle s1'>✦</div><div class='sparkle s2'>✧</div><div class='sparkle s3'>✦</div>
+          <div class='meta'>SKY MOOD BOARD</div>
+          <div class='topSearch'><input id='locInput' class='input' value='${{d.location}}' /><input id='dateInput' type='date' class='input dateInput' value='${{d.selectedDate||''}}' /><button id='locBtn' class='btn'>조회</button></div>
+          <div class='utility'>
+            <button id='geoBtn' class='utilBtn'>📍 현재위치</button>
+            <button id='unitBtn' class='utilBtn'>🌬️ 풍속단위: ${{WIND_UNIT}}</button>
+            <button id='favBtn' class='utilBtn'>${{favOn?'★':'☆'}} 관심지역</button>
+            <button id='legendBtn' class='utilBtn'>ⓘ 기호설명</button>
+          </div>
+          <h1>${{d.location}}</h1><div class='sub'>${{d.updated}} · (${{d.lat.toFixed(2)}}, ${{d.lon.toFixed(2)}})</div>
+          <div style='display:flex;justify-content:center;gap:6px;margin-top:6px'><button class='mini' data-q='해파랑27번길'>해파랑27번길</button><button class='mini' data-q='해파랑길'>해파랑길</button><button class='mini' data-q='한라산 성판악'>한라산 성판악</button><button class='mini' data-q='북한산 둘레길'>북한산 둘레길</button></div>
+          <div class='nearby'>${{NEARBY_SPOTS.map(x=>`<button class='nearChip' data-q='${{x}}'>${{x}}</button>`).join('')}}</div>
+          ${{FAVORITES.length?`<div class='favs'>${{FAVORITES.map(x=>`<button class='favTag' data-q='${{x}}'>★ ${{x}}</button>`).join('')}}</div>`:''}}
+          <div id='legend' class='legend' style='display:none'>
+            <div class='legendRow'>
+              <span class='legendItem'>☀️ 맑음</span><span class='legendItem'>⛅ 구름조금</span><span class='legendItem'>☁️ 흐림</span><span class='legendItem'>🌧️ 비</span><span class='legendItem'>❄️ 눈</span><span class='legendItem'>⛈️ 뇌우/우박</span>
+            </div>
+          </div>
+        </div>
+        ${{d.alerts.length?`<div class='card' style='background:rgba(248,113,113,.14);border-color:rgba(248,113,113,.45);color:#fecaca'>⚠️ ${{d.alerts.join(' / ')}}</div>`:''}}
+        ${{advisories.length?`<div class='advisory'>${{advisories.map(x=>`<span class='heroTag'>⚠️ ${{x}}</span>`).join('')}}</div>`:''}}
+        <div class='row'>
+          <div class='card heroRow'>
+            <div>
+              <div class='temp'>${{d.current.temp}}°</div>
+              <div class='heroSub'>체감 ${{d.current.feels}}° · 최고 ${{d.current.high}}° / 최저 ${{d.current.low}}°</div>
+              <div class='heroMeta'>
+                <span class='heroTag'>${{d.current.condition}}</span>
+                <span class='heroTag'>강수확률 ${{d.current.rainProb}}%</span>
+                <span class='heroTag'>${{d.current.precipType}}</span>
+                <span class='heroTag sunTag sunriseTag'>🌅 <strong>일출</strong> ${{d.sunrise}}</span>
+                <span class='heroTag sunTag sunsetTag'>🌇 <strong>일몰</strong> ${{d.sunset}}</span>
+              </div>
+            </div>
+            <div class='hero'>${{d.current.conditionIcon}}</div>
+          </div>
+        </div>
+        <div class='quick'>
+          <div class='card qcard'><div class='qemoji'>💧</div><div class='qtitle'>습도</div><div class='qvalue'>${{d.current.humidity}}%</div><div>${{chip(lv(d.current.humidity,[40,60],['낮음','보통','높음']))}}</div><div class='qnote'>쾌적 구간: 40~60%</div></div>
+          <div class='card qcard'><div class='qemoji'>🌬️</div><div class='qtitle'>바람</div><div class='qvalue'>${{windFmt(d.current.wind)}}</div><div>${{chip(lv(d.current.wind,[3,7],['약함','보통','강함']))}}</div><div class='qnote'>돌풍 ${{windFmt(d.current.gust)}}</div></div>
+          <div class='card qcard'><div class='qemoji'>☀️</div><div class='qtitle'>자외선 (UV)</div><div class='qvalue'>${{d.current.uv}}</div><div>${{chip(lv(d.current.uv,[2,5,7,10],['낮음','보통','높음','매우높음','위험']))}}</div><div class='qnote'>야외 노출 지수</div></div>
+          <div class='card qcard'><div class='qemoji'>🌫️</div><div class='qtitle'>미세먼지 (PM10 / PM2.5)</div><div class='qvalue' style='font-size:22px'>${{d.current.pm10}} / ${{d.current.pm25}}</div><div style='display:flex;gap:6px;flex-wrap:wrap'>${{chip('PM10 '+lv(d.current.pm10,[30,80,150],['좋음','보통','나쁨','매우나쁨']))}} ${{chip('PM2.5 '+lv(d.current.pm25,[15,35,75],['좋음','보통','나쁨','매우나쁨']))}}</div><div class='qnote'>PM10은 큰 먼지, PM2.5는 더 작은 먼지</div></div>
+          <div class='card qcard'><div class='qemoji'>🫧</div><div class='qtitle'>오존 O₃</div><div class='qvalue'>${{d.current.ozone}}</div><div>${{chip(o3Label)}}</div><div class='qnote'>자외선과 별개 대기 성분</div></div>
+          <div class='card qcard'><div class='qemoji'>🏭</div><div class='qtitle'>이산화질소 NO₂</div><div class='qvalue'>${{d.current.no2}}</div><div>${{chip(no2Label)}}</div><div class='qnote'>교통/배출 영향 지표</div></div>
+        </div>
+        <div class='fun'><span class='funLabel'>오늘의 한줄 브리핑</span><span class='microEmoji'>🎈</span> ${{funLine(d)}}</div>
+        <div class='outfit'><b>👕 오늘 뭐 입지?</b><p>${{outfitHint(d)}}</p><div class='outfitSplit'><b>🧺 빨래 말리기</b><p>${{laundry.text}}</p></div></div>
+        <div class='card' style='margin-top:8px'>
+          <div style='display:flex;justify-content:space-between;align-items:center;gap:8px'>
+            <b style='font-size:12px;color:#bfdbfe'>주간 종합 브리핑</b>
+            <button id='copyBtn' class='mini'>카카오 공유 문구 복사</button>
+          </div>
+          <div class='summary'>${{weekSummaryHtml(d.weekly)}}</div>
+        </div>
+        <div class='tabbar'><button class='tabbtn on' data-t='d'>⏰ 일간</button><button class='tabbtn' data-t='w'>📅 주간</button></div>
+        <div class='tab on' id='td'><div class='card'><div class='miniCharts'><div class='tile'><div>기온 흐름</div><div class='chart' id='c1'></div><div id='m1'></div></div><div class='tile'><div>강수확률</div><div class='chart' id='c2'></div><div id='m2'></div></div></div>${{rowsH}}</div></div>
+        <div class='tab' id='tw'><div class='card'><div class='miniCharts'><div class='tile'><div>최고기온 추세</div><div class='chart' id='c3'></div><div id='m3'></div></div><div class='tile'><div>강수확률 추세</div><div class='chart' id='c4'></div><div id='m4'></div></div></div>${{rowsW}}</div></div>
+        <div class='foot'>상단 지역 입력창에서 바꾸면 아래 전체가 즉시 업데이트됩니다.</div>`;
+
+      document.getElementById('c1').innerHTML = spark(d.hourly.map(x=>x.temp), d.hourly.map(x=>x.time), '#60a5fa','line');
+      document.getElementById('c2').innerHTML = spark(d.hourly.map(x=>x.rain), d.hourly.map(x=>x.time), '#f59e0b','bar');
+      document.getElementById('c3').innerHTML = spark(d.weekly.map(x=>x.high), d.weekly.map(x=>x.day), '#f87171','line');
+      document.getElementById('c4').innerHTML = spark(d.weekly.map(x=>x.rain), d.weekly.map(x=>x.day), '#f43f5e','bar');
+      document.getElementById('m1').innerHTML = chartMeta(d.hourly.map(x=>x.time), d.hourly.map(x=>x.temp), '°');
+      document.getElementById('m2').innerHTML = chartMeta(d.hourly.map(x=>x.time), d.hourly.map(x=>x.rain), '%');
+      document.getElementById('m3').innerHTML = chartMeta(d.weekly.map(x=>`${{x.day}}(${{x.dateText}})`), d.weekly.map(x=>x.high), '°');
+      document.getElementById('m4').innerHTML = chartMeta(d.weekly.map(x=>`${{x.day}}(${{x.dateText}})`), d.weekly.map(x=>x.rain), '%');
+
+      document.querySelectorAll('.tabbtn').forEach(b=>b.onclick=()=>{{document.querySelectorAll('.tabbtn').forEach(x=>x.classList.remove('on')); b.classList.add('on'); const isD=b.dataset.t==='d'; document.getElementById('td').classList.toggle('on',isD); document.getElementById('tw').classList.toggle('on',!isD);}});
+      const dInput = document.getElementById('dateInput');
+      if(dInput && d.weekly.length){{
+        dInput.min = d.weekly[0].date;
+        dInput.max = d.weekly[d.weekly.length-1].date;
+      }}
+      applyTimeTheme();
+      document.getElementById('locBtn').onclick = searchAndRender;
+      document.getElementById('locInput').onkeydown = e=>{{ if(e.key==='Enter') searchAndRender(); }};
+      document.getElementById('dateInput').onchange = ()=> searchAndRender();
+      document.querySelectorAll('[data-q]').forEach(x=> x.onclick = ()=>{{document.getElementById('locInput').value=x.dataset.q; searchAndRender();}});
+      document.getElementById('unitBtn').onclick = ()=>{{ WIND_UNIT = WIND_UNIT==='m/s' ? 'km/h' : 'm/s'; render(); }};
+      document.getElementById('legendBtn').onclick = ()=>{{ const el=document.getElementById('legend'); el.style.display = el.style.display==='none' ? 'block' : 'none'; }};
+      document.getElementById('favBtn').onclick = ()=>{{ toggleFav(d.location); render(); }};
+      document.getElementById('geoBtn').onclick = ()=>{{
+        if(!navigator.geolocation) return alert('브라우저 위치 기능을 지원하지 않습니다.');
+        navigator.geolocation.getCurrentPosition(async (pos)=>{{
+          try{{
+            const loc = {{name:'현재위치', lat:pos.coords.latitude, lon:pos.coords.longitude}};
+            const data = await fetchAll(loc);
+            S = buildState(loc, data.forecast, data.air, SELECTED_DATE);
+            render();
+          }}catch(e){{ alert('현재위치 조회 실패: '+(e.message||e)); }}
+        }}, ()=> alert('위치 권한이 필요합니다.'), {{enableHighAccuracy:true, timeout:7000}});
+      }};
+      document.getElementById('copyBtn').onclick = async ()=>{{
+        const isLocal = window.location.protocol === 'file:';
+        const q = encodeURIComponent(`${{d.location}} 날씨`);
+        const weatherLink = `https://search.naver.com/search.naver?query=${{q}}`;
+        const mapLink = `https://map.kakao.com/?q=${{encodeURIComponent(d.location)}}`;
+        const dashLink = isLocal ? weatherLink : window.location.href;
+        const msg = [
+          `📍 ${{d.location}} 날씨 공유`,
+          `지금 ${{d.current.temp}}°C (체감 ${{d.current.feels}}°C), 강수확률 ${{d.current.rainProb}}%`,
+          `🥾 트레킹 참고해서 일정 잡아봐!`,
+          `대시보드/날씨 링크: ${{dashLink}}`,
+          `지도 링크: ${{mapLink}}`,
+        ].join('\\n');
+        try{{
+          await navigator.clipboard.writeText(msg);
+          alert(isLocal
+            ? '카카오톡에서 클릭 가능한 공유 문구를 복사했습니다. (로컬 file:// 주소는 공유 불가)'
+            : '카카오톡 공유 문구를 복사했습니다.');
+        }} catch(_ ) {{
+          alert('복사 실패. 브라우저 권한을 확인해주세요.');
+        }}
+      }};
+    }}
+
+    async function searchAndRender(){{
+      const btn = document.getElementById('locBtn');
+      const q = document.getElementById('locInput').value;
+      const pickedDate = (document.getElementById('dateInput')?.value || '').trim();
+      try{{
+        btn.textContent='조회중...';
+        const loc = await resolveLoc(q);
+        const data = await fetchAll(loc);
+        SELECTED_DATE = pickedDate || SELECTED_DATE;
+        S = buildState(loc, data.forecast, data.air, SELECTED_DATE);
+        render();
+      }}catch(e){{
+        alert('지역 변경 실패: '+e.message);
+      }} finally {{
+        const b = document.getElementById('locBtn'); if (b) b.textContent='지역변경';
+      }}
+    }}
+
+    (async()=>{{
+      try{{
+        loadFavs();
+        let loc;
+        try {{
+          loc = await resolveLoc(DEFAULT_QUERY);
+        }} catch(_e) {{
+          loc = TRAIL_PRESETS['태백시'];
+        }}
+        const data = await fetchAll(loc);
+        SELECTED_DATE = data.forecast.current_weather.time.slice(0,10);
+        S = buildState(loc, data.forecast, data.air, SELECTED_DATE);
+        render();
+      }}catch(e){{
+        showFatal('초기 로딩 실패', e.message || e);
+      }}
+    }})();
+  </script>
+</body>
+</html>"""
+
+
+def open_html(path: Path) -> bool:
+    chrome_candidates = [
+        Path(os.environ.get("LOCALAPPDATA", "")) / "Google/Chrome/Application/chrome.exe",
+        Path(os.environ.get("PROGRAMFILES", "")) / "Google/Chrome/Application/chrome.exe",
+        Path(os.environ.get("PROGRAMFILES(X86)", "")) / "Google/Chrome/Application/chrome.exe",
+    ]
+    for chrome in chrome_candidates:
+        if chrome.exists():
+            try:
+                subprocess.Popen([str(chrome), str(path)], close_fds=True)
+                return True
+            except Exception:
+                pass
+    try:
+        if webbrowser.open(path.as_uri(), new=2):
+            return True
+    except Exception:
+        pass
+    if hasattr(os, "startfile"):
+        try:
+            os.startfile(str(path))
+            return True
+        except Exception:
+            pass
+    return False
+
+
+def main() -> None:
+    args = parse_args()
+    html = build_html(args.query)
+    out_dir = Path(__file__).resolve().parent
+    out_path = out_dir / HTML_FILE
+    index_path = out_dir / INDEX_FILE
+    out_path.write_text(html, encoding="utf-8")
+    index_path.write_text(html, encoding="utf-8")
+    if not open_html(out_path):
+        print(f"[안내] 브라우저 자동 열기 실패: {out_path}")
+    print(f"완료: {out_path}")
+    print(f"배포용: {index_path}")
+
+
+if __name__ == "__main__":
+    main()
+
