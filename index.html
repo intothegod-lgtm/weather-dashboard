@@ -28,7 +28,7 @@
       linear-gradient(140deg,#020617,#0f172a,#1e293b)}
     .wrap{max-width:980px;margin:0 auto;padding:14px} .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px;transition:transform .2s ease,border-color .2s ease,box-shadow .2s ease;animation:cardIn .45s ease both}
     .card:hover{transform:translateY(-2px);border-color:rgba(255,255,255,.24);box-shadow:0 8px 24px rgba(15,23,42,.35)}
-    .head{text-align:center;margin-bottom:8px;position:relative;overflow:visible} .meta{font-size:10px;color:#6f8299;letter-spacing:.16em} h1{margin:4px 0;font-size:24px} .sub{font-size:14px;font-weight:700;color:#c7d6ea}
+    .head{text-align:center;margin-bottom:8px;position:relative;overflow:visible} .meta{font-size:10px;color:#6f8299;letter-spacing:.16em} h1{margin:6px 0;font-size:34px;line-height:1.05;letter-spacing:.01em} .sub{font-size:14px;font-weight:700;color:#c7d6ea}
     .utility{display:flex;gap:6px;justify-content:center;flex-wrap:wrap;margin-top:6px}
     .utilBtn{border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.08);color:#dbeafe;border-radius:999px;padding:5px 10px;font-size:12px;font-weight:800;cursor:pointer}
     .nearby{display:flex;gap:6px;overflow:auto;padding:6px 2px 2px;margin-top:4px}
@@ -64,7 +64,7 @@
     .heroSub{font-size:17px;color:#dbe7f7;font-weight:800}
     .quick{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:8px}
     .qcard{display:flex;flex-direction:column;gap:4px}
-    .qemoji{font-size:30px;line-height:1;animation:wiggle 2.6s ease-in-out infinite}
+    .qemoji{font-size:30px;line-height:1}
     .qtitle{font-size:14px;color:#c7d6ea;font-weight:800}
     .qvalue{font-size:30px;font-weight:900;line-height:1.05}
     .qnote{font-size:12px;color:#9db0c8;font-weight:700}
@@ -88,7 +88,18 @@
     .hourMetaRow{display:flex;justify-content:space-between;gap:8px;margin-top:7px;font-size:12px;font-weight:800;color:#bfd2ea}
     .hourWarn{border-color:rgba(248,113,113,.45);background:rgba(127,29,29,.22)}
     .hourPeak{box-shadow:inset 0 0 0 1px rgba(251,191,36,.4)}
-    .wrow{display:grid;grid-template-columns:72px 46px 74px 90px 74px 1fr 184px;gap:6px;align-items:center;padding:7px 6px;border-top:1px dashed rgba(255,255,255,.08);font-size:13px} .wrow:first-child{border-top:none}
+    .weekStrip{display:flex;gap:10px;overflow-x:auto;padding:4px 2px 2px}
+    .weekCard{min-width:186px;padding:12px;border-radius:14px;border:1px solid rgba(255,255,255,.12);background:rgba(15,23,42,.34)}
+    .weekHead{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}
+    .weekDay{font-size:16px;font-weight:900;color:#f8fbff}
+    .weekDate{margin-top:2px;font-size:12px;font-weight:800;color:#bfd2ea}
+    .weekIcon{font-size:38px;line-height:1}
+    .weekState{margin-top:8px;font-size:14px;font-weight:800;color:#dbe7f7}
+    .weekTemps{margin-top:8px;font-size:24px;font-weight:900;color:#f8fbff}
+    .weekRain{margin-top:6px;font-size:13px;font-weight:900;color:#fde68a}
+    .weekAlerts{margin-top:8px;font-size:12px;font-weight:800;color:#fecaca;min-height:16px}
+    .weekActivities{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+    .weekBest{box-shadow:inset 0 0 0 1px rgba(251,191,36,.42);background:linear-gradient(180deg,rgba(251,191,36,.12),rgba(15,23,42,.34))}
     .activityWrap{display:flex;gap:6px;justify-content:flex-end;flex-wrap:wrap}
     .activityBadge{display:inline-flex;align-items:center;gap:5px;padding:6px 10px;border-radius:999px;font-size:14px;font-weight:900;line-height:1;border:1px solid rgba(255,255,255,.18);text-shadow:0 1px 1px rgba(0,0,0,.35)}
     .activityBadge .e{font-size:18px;line-height:1}
@@ -100,15 +111,15 @@
     .summaryLine:first-child{margin-top:0}
     .summaryTrek{margin-top:10px;padding:12px 14px;border-radius:12px;background:linear-gradient(90deg,rgba(251,191,36,.24),rgba(249,115,22,.18));border:1px solid rgba(253,186,116,.55);font-size:20px;line-height:1.45;font-weight:900;color:#fff7d6;box-shadow:0 10px 24px rgba(120,53,15,.18)}
     .advisory{margin-top:8px;padding:8px 10px;border-radius:10px;border:1px solid rgba(248,113,113,.35);background:rgba(127,29,29,.22);display:flex;gap:6px;flex-wrap:wrap}
-    .fun{margin-top:8px;padding:14px 16px;border-radius:12px;background:linear-gradient(90deg,rgba(251,191,36,.16),rgba(236,72,153,.14));border:1px solid rgba(251,191,36,.35);font-size:19px;line-height:1.72;font-weight:800;letter-spacing:.03em;color:#fde68a;animation:pulseFun 2.2s ease-in-out infinite}
-    .funLabel{display:block;margin-bottom:6px;font-size:12px;font-weight:900;letter-spacing:.16em;color:#fff1b3}
+    .fun{margin-top:8px;padding:18px 20px;border-radius:14px;background:linear-gradient(90deg,rgba(251,191,36,.18),rgba(236,72,153,.16));border:1px solid rgba(251,191,36,.42);font-size:24px;line-height:1.82;font-weight:900;letter-spacing:.035em;color:#fde68a;box-shadow:0 14px 34px rgba(124,45,18,.18);animation:pulseFun 2.6s ease-in-out infinite}
+    .funLabel{display:block;margin-bottom:8px;font-size:14px;font-weight:900;letter-spacing:.18em;color:#fff1b3}
     .outfit{margin-top:8px;padding:10px 11px;border-radius:10px;background:linear-gradient(90deg,rgba(74,222,128,.14),rgba(56,189,248,.12));border:1px solid rgba(134,239,172,.32)}
     .outfit b{font-size:15px;color:#dcfce7}
     .outfit p{margin:4px 0 0;font-size:14px;line-height:1.5;color:#eafff3;font-weight:700}
     .outfitSplit{margin-top:8px;padding-top:8px;border-top:1px dashed rgba(255,255,255,.16)}
     .outfitSplit b{display:block;font-size:14px;color:#fef3c7}
     .outfitSplit p{margin:4px 0 0;font-size:14px;line-height:1.5;color:#fff7d6;font-weight:700}
-    .microEmoji{font-size:22px;display:inline-block;animation:wiggle 2.4s ease-in-out infinite}
+    .microEmoji{font-size:30px;display:inline-block;transform-origin:center;animation:briefingOrbit 2.8s ease-in-out infinite}
     .bgFun{position:fixed;inset:0;pointer-events:none;z-index:0}
     .floatie{position:absolute;font-size:20px;opacity:.12;animation:drift 20s linear infinite}
     .f1{left:6%;top:72%;animation-duration:16s}
@@ -123,6 +134,7 @@
     @keyframes twinkle{0%,100%{opacity:.2;transform:scale(.7)}50%{opacity:1;transform:scale(1.2)}}
     @keyframes pulseFun{0%,100%{transform:scale(1)}50%{transform:scale(1.01)}}
     @keyframes wiggle{0%,100%{transform:rotate(0)}25%{transform:rotate(-8deg)}75%{transform:rotate(8deg)}}
+    @keyframes briefingOrbit{0%,100%{transform:translateY(0) rotate(0) scale(1)}20%{transform:translateY(-3px) rotate(-10deg) scale(1.08)}50%{transform:translateY(-6px) rotate(8deg) scale(1.18)}80%{transform:translateY(-2px) rotate(-6deg) scale(1.06)}}
     @keyframes drift{0%{transform:translateY(0) translateX(0)}50%{transform:translateY(-120px) translateX(20px)}100%{transform:translateY(-260px) translateX(-10px)}}
     @keyframes drawLine{to{stroke-dashoffset:0}}
     @keyframes growBar{from{transform:scaleY(0);transform-origin:bottom}to{transform:scaleY(1);transform-origin:bottom}}
@@ -147,20 +159,20 @@
       .brandTag{position:static;display:inline-block;margin-top:6px}
       .bgFun,.sparkle{display:none}
       .skyBuddy{position:static;display:block;margin:0 auto 4px;animation:none}
-      .wrow{display:flex;flex-wrap:wrap;gap:5px;font-size:12px;padding:8px 0}
-      .wrow>div{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.10);border-radius:8px;padding:4px 6px}
-      .wrow>div:nth-child(1){font-weight:900}
-      .wrow>div:nth-child(6){flex:1 1 100%}
+      .weekCard{min-width:168px}
       .hourCard{min-width:116px}
       .summary{font-size:15px;line-height:1.5}
       .summaryTrek{font-size:18px;line-height:1.4}
-      .fun{font-size:17px;line-height:1.65;padding:13px 14px}
+      .fun{font-size:20px;line-height:1.7;padding:16px 16px}
+      .funLabel{font-size:13px}
+      .microEmoji{font-size:26px}
       .utility,.favs{justify-content:flex-start}
       .nearby{padding-bottom:4px}
       .chart{height:120px}
       .chartMeta{gap:4px}
       .metaChip{font-size:11px;padding:4px 7px}
       .qvalue{font-size:24px}
+      h1{font-size:30px}
       .temp{font-size:54px;text-align:center}
       .heroSub{font-size:16px;text-align:center}
       .heroMeta{justify-content:center}
@@ -318,15 +330,14 @@
       if(mode==='bar'){
         const bw=Math.max(3,step-4), maxv=Math.max(1,...arr);
         body=arr.map((v,i)=>{const bh=(v/maxv)*(h-p*2), x=p+i*step-bw/2, y=h-p-bh; return `<rect x='${x}' y='${y}' width='${bw}' height='${bh}' rx='2' fill='${color}' style='animation:growBar .6s ease both;animation-delay:${i*0.07}s'/>`;}).join('');
-        body += `<defs><marker id='arrowHeadBar' markerWidth='9' markerHeight='7' refX='7' refY='3.5' orient='auto'><polygon points='0 0, 9 3.5, 0 7' fill='${color}'/></marker></defs>`;
-        body += `<line x1='${p}' y1='${h-p+1}' x2='${w-p+2}' y2='${h-p+1}' stroke='${color}' stroke-width='1.8' marker-end='url(#arrowHeadBar)' style='opacity:.85;stroke-dasharray:420;stroke-dashoffset:420;animation:drawLine 1.1s ease forwards'/>`;
+        body += `<line x1='${p}' y1='${h-p+1}' x2='${w-p}' y2='${h-p+1}' stroke='${color}' stroke-width='1.8' style='opacity:.85;stroke-dasharray:420;stroke-dashoffset:420;animation:drawLine 1.1s ease forwards'/>`;
       } else {
         if(arr.length < 2){
           const cy = h-p-((arr[0]-min)/span)*(h-p*2);
           body = `<circle cx='${p}' cy='${cy}' r='4' fill='${color}'/>`;
         } else {
           const pts=arr.map((v,i)=>`${p+i*step},${h-p-((v-min)/span)*(h-p*2)}`).join(' ');
-          body=`<defs><marker id='arrowHead' markerWidth='10' markerHeight='8' refX='8' refY='4' orient='auto'><polygon points='0 0, 10 4, 0 8' fill='${color}'/></marker></defs><polyline points='${pts}' fill='none' stroke='${color}' stroke-width='3' marker-end='url(#arrowHead)' style='stroke-dasharray:520;stroke-dashoffset:520;animation:drawLine 1.2s ease forwards'/><circle r='4' fill='${color}' style='filter:drop-shadow(0 0 6px ${color})'><animateMotion dur='1.2s' fill='freeze' path='M${pts.replace(/ /g,' L')}'/></circle>`;
+          body=`<polyline points='${pts}' fill='none' stroke='${color}' stroke-width='3' style='stroke-dasharray:520;stroke-dashoffset:520;animation:drawLine 1.2s ease forwards'/><circle r='4' fill='${color}' style='filter:drop-shadow(0 0 6px ${color})'><animateMotion dur='1.2s' fill='freeze' path='M${pts.replace(/ /g,' L')}'/></circle>`;
         }
       }
       return `<svg viewBox='0 0 ${w} ${h}' width='100%' height='100%'>${gridV}${body}</svg>`;
@@ -374,7 +385,7 @@
     async function fetchAll(loc){
       const f=new URL('https://api.open-meteo.com/v1/forecast');
       f.searchParams.set('latitude',loc.lat); f.searchParams.set('longitude',loc.lon); f.searchParams.set('timezone','Asia/Seoul');
-      f.searchParams.set('current_weather','true'); f.searchParams.set('forecast_days','16');
+      f.searchParams.set('current_weather','true'); f.searchParams.set('forecast_days','7');
       f.searchParams.set('daily','weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,wind_speed_10m_max,sunrise,sunset');
       f.searchParams.set('hourly','temperature_2m,apparent_temperature,relative_humidity_2m,precipitation_probability,rain,snowfall,weather_code,wind_speed_10m,wind_gusts_10m,uv_index,visibility,surface_pressure,dew_point_2m,cloud_cover');
       const a=new URL('https://air-quality-api.open-meteo.com/v1/air-quality');
@@ -432,7 +443,7 @@
       const wk=['월','화','수','목','금','토','일'];
       const dly = forecast.daily;
       const dv = (k,i,d=0)=>Number((dly[k]?.[i]) ?? d);
-      const weekly = (dly.time||[]).map((d,i)=>{
+      const weekly = (dly.time||[]).slice(0,7).map((d,i)=>{
         const dd=new Date(d+'T00:00:00');
         const rain=Math.round(dv('precipitation_probability_max',i,0));
         const wind=dv('wind_speed_10m_max',i,0);
@@ -586,7 +597,7 @@
       const no2Label = lv(d.current.no2,[40,80,180],['좋음','보통','나쁨','매우나쁨']);
       const laundry = laundryHint(d);
       const rowsH = d.hourly.map(h=>`<div class='hourCard ${h.warn?'hourWarn':''} ${h.isHigh||h.isLow?'hourPeak':''}'><div class='hourTop'><div class='hourTime'>${h.time}</div><div class='hourBadge'>${h.isHigh?'최고':h.isLow?'최저':'예보'}</div></div><div class='hourTemp'>${h.temp}°</div><div class='hourType'>${h.hail?'우박 ⛈️':h.type} · ${h.cloudText}</div><div class='hourMetaRow'><span>강수</span><span style='color:${rainColor(h.rain)}'>${h.rain}%</span></div><div class='hourMetaRow'><span>바람</span><span>${windFmt(h.wind)}</span></div></div>`).join('');
-      const rowsW = d.weekly.map(w=>`<div class='wrow ${w.best?'best':''}'><div><b style='font-size:15px'>${w.day}</b><div style='font-size:13px;color:#b8c7da;font-weight:700'>${w.dateText} (${w.dow})</div></div><div style='font-size:36px;line-height:1'>${w.icon}</div><div>${w.state}</div><div style='text-align:right;font-weight:700'>${w.high}° / ${w.low}°</div><div style='text-align:right;color:${rainColor(w.rain)};font-weight:800'>강수 ${w.rain}%</div><div>${w.alerts.join(' · ')||'-'}</div><div class='activityWrap'><span class='activityBadge ${w.trek?'activityOk':'activityNo'}'><span class='e'>🥾</span>${w.trek?'트레킹 가능':'트레킹 주의'}</span><span class='activityBadge ${w.run?'activityOk':'activityNo'}'><span class='e'>🏃</span>${w.run?'러닝 가능':'러닝 주의'}</span>${w.best?" <span class='activityBadge activityBest'><span class='e'>⭐</span>베스트</span>":''}</div></div>`).join('');
+      const rowsW = d.weekly.map(w=>`<div class='weekCard ${w.best?'weekBest':''}'><div class='weekHead'><div><div class='weekDay'>${w.day}</div><div class='weekDate'>${w.dateText} (${w.dow})</div></div><div class='weekIcon'>${w.icon}</div></div><div class='weekState'>${w.state}</div><div class='weekTemps'>${w.high}° / ${w.low}°</div><div class='weekRain' style='color:${rainColor(w.rain)}'>강수 ${w.rain}%</div><div class='weekAlerts'>${w.alerts.join(' · ')||'주의사항 없음'}</div><div class='weekActivities'><span class='activityBadge ${w.trek?'activityOk':'activityNo'}'><span class='e'>🥾</span>${w.trek?'트레킹 가능':'트레킹 주의'}</span><span class='activityBadge ${w.run?'activityOk':'activityNo'}'><span class='e'>🏃</span>${w.run?'러닝 가능':'러닝 주의'}</span>${w.best?"<span class='activityBadge activityBest'><span class='e'>⭐</span>베스트</span>":''}</div></div>`).join('');
       const favOn = FAVORITES.includes(d.location);
       const advisories = [];
       if(d.current.rainProb>=70) advisories.push('강한 비 가능성');
@@ -658,7 +669,7 @@
         </div>
         <div class='tabbar'><button class='tabbtn on' data-t='d'>⏰ 일간</button><button class='tabbtn' data-t='w'>📅 주간</button></div>
         <div class='tab on' id='td'><div class='card'><div class='miniCharts'><div class='tile'><div>기온 흐름</div><div class='chart' id='c1'></div><div id='m1'></div></div><div class='tile'><div>강수확률</div><div class='chart' id='c2'></div><div id='m2'></div></div></div><div class='hourStrip'>${rowsH}</div></div></div>
-        <div class='tab' id='tw'><div class='card'><div class='miniCharts'><div class='tile'><div>최고기온 추세</div><div class='chart' id='c3'></div><div id='m3'></div></div><div class='tile'><div>강수확률 추세</div><div class='chart' id='c4'></div><div id='m4'></div></div></div>${rowsW}</div></div>
+        <div class='tab' id='tw'><div class='card'><div class='miniCharts'><div class='tile'><div>최고기온 추세</div><div class='chart' id='c3'></div><div id='m3'></div></div><div class='tile'><div>강수확률 추세</div><div class='chart' id='c4'></div><div id='m4'></div></div></div><div class='weekStrip'>${rowsW}</div></div></div>
         <div class='foot'>상단 지역 입력창에서 바꾸면 아래 전체가 즉시 업데이트됩니다.</div>`;
 
       document.getElementById('c1').innerHTML = spark(d.hourly.map(x=>x.temp), d.hourly.map(x=>x.time), '#60a5fa','line');
